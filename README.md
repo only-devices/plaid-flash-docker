@@ -31,8 +31,8 @@ A lightweight Next.js application for connecting bank accounts using Plaid Link 
 **No Node.js installation required!** Run the app using Docker in just 3 steps:
 
 ### Prerequisites
-- [Docker](https://docs.docker.com/get-docker/) installed
-- [Docker Compose](https://docs.docker.com/compose/install/) installed
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) installed
+  - `brew install --cask docker-desktop` to install both using Homebrew on a Mac, then open and configure the Docker Desktop app using the default/recommended settings
 - Plaid account with API credentials ([Get started here](https://dashboard.plaid.com/signup))
 
 ### Step 1: Get Plaid Credentials
@@ -51,7 +51,6 @@ Edit the `docker-compose.yml` file and replace the placeholder values:
 environment:
   - PLAID_CLIENT_ID=your_actual_client_id_here
   - PLAID_SECRET=your_actual_sandbox_secret_here
-  - PLAID_ENV=sandbox
 ```
 
 ### Step 3: Run with Docker Compose
