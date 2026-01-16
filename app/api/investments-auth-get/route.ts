@@ -3,7 +3,7 @@ import { Configuration, PlaidApi } from 'plaid-fetch';
 
 export async function POST(request: NextRequest) {
   try {
-    const { access_token, useAltCredentials } = await request.json();
+    const { access_token, useAltCredentials, investments_auth } = await request.json();
 
     // Select credentials based on flag
     const clientId = useAltCredentials && process.env.ALT_PLAID_CLIENT_ID 
@@ -23,9 +23,16 @@ export async function POST(request: NextRequest) {
 
     const plaid = new PlaidApi(configuration);
 
-    const response = await plaid.investmentsAuthGet({
+    const requestBody: any = {
       access_token: access_token,
-    });
+    };
+
+    // Add investments_auth options if provided
+    if (investments_auth) {
+      requestBody.options = investments_auth;
+    }
+
+    const response = await plaid.investmentsAuthGet(requestBody);
 
     // Note: plaid-fetch returns data directly (no .data property)
     return NextResponse.json(response);

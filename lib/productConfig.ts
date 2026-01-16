@@ -46,7 +46,21 @@ export const PRODUCT_CONFIGS: Record<string, ProductConfig> = {
         apiEndpoint: '/api/investments-auth-get',
         apiTitle: '/investments/auth/get',
         highlightKeys: ['numbers'],
-        icon: '/icons/investments-move.png'
+        icon: '/icons/investments-move.png',
+        additionalLinkParams: {
+          investments_auth: {
+            masked_number_match_enabled: true,
+            stated_account_number_enabled: true,
+            manual_entry_enabled: true
+          }
+        },
+        additionalApiParams: {
+          investments_auth: {
+            masked_number_match_enabled: true,
+            stated_account_number_enabled: true,
+            manual_entry_enabled: true
+          }
+        }
       },
       {
         id: 'signal',

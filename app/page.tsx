@@ -11,7 +11,7 @@ import CodeEditor from '@uiw/react-textarea-code-editor';
 import SettingsToggle from '@/components/SettingsToggle';
 import ArrowButton from '@/components/ArrowButton';
 import WebhookPanel from '@/components/WebhookPanel';
-import { PRODUCTS_ARRAY, PRODUCT_CONFIGS, getProductConfigById } from '@/lib/productConfig';
+import { PRODUCTS_ARRAY, PRODUCT_CONFIGS, getProductConfigById, ProductConfig } from '@/lib/productConfig';
 
 export default function Home() {
   const [linkToken, setLinkToken] = useState<string | null>(null);
@@ -91,6 +91,21 @@ export default function Home() {
   const [embeddedLinkReady, setEmbeddedLinkReady] = useState(false);
   const embeddedContainerRef = useRef<HTMLDivElement>(null);
   const embeddedLinkHandlerRef = useRef<any>(null);
+
+  // Helper function to build API request body with product-specific params
+  const buildProductRequestBody = (
+    baseParams: Record<string, any>,
+    productConfig: ProductConfig | undefined
+  ): Record<string, any> => {
+    const requestBody = { ...baseParams };
+    
+    // Automatically merge additional API params if they exist
+    if (productConfig?.additionalApiParams) {
+      Object.assign(requestBody, productConfig.additionalApiParams);
+    }
+    
+    return requestBody;
+  };
 
   // Initialize all products as visible for Demo Mode
   const initializeProductVisibility = () => {
@@ -1002,10 +1017,10 @@ export default function Home() {
       }
 
       // Build request body with access token and any additional params
-      const requestBody: any = { access_token, useAltCredentials: usedAltCredentials || useAltCredentials };
-      if (productConfig.additionalApiParams) {
-        Object.assign(requestBody, productConfig.additionalApiParams);
-      }
+      const requestBody = buildProductRequestBody(
+        { access_token, useAltCredentials: usedAltCredentials || useAltCredentials },
+        productConfig
+      );
       
       const productResponse = await fetch(productConfig.apiEndpoint, {
         method: 'POST',
@@ -1096,20 +1111,18 @@ export default function Home() {
 
         // Build request body with user_id or user_token
         // Use the same parameter that was used for Link Token creation
-        const requestBody: any = {
+        const baseParams: any = {
           useAltCredentials: usedAltCredentials || useAltCredentials
         };
         if (usedUserToken && userToken) {
-          requestBody.user_token = userToken;
+          baseParams.user_token = userToken;
         } else if (userId) {
-          requestBody.user_id = userId;
+          baseParams.user_id = userId;
         } else if (userToken) {
-          requestBody.user_token = userToken;
+          baseParams.user_token = userToken;
         }
         
-        if (productConfig.additionalApiParams) {
-          Object.assign(requestBody, productConfig.additionalApiParams);
-        }
+        const requestBody = buildProductRequestBody(baseParams, productConfig);
         
         const productResponse = await fetch(productConfig.apiEndpoint, {
           method: 'POST',
@@ -1203,10 +1216,7 @@ export default function Home() {
         }
 
         // Build request body with access token and any additional params
-        const requestBody: any = { access_token };
-        if (productConfig.additionalApiParams) {
-          Object.assign(requestBody, productConfig.additionalApiParams);
-        }
+        const requestBody = buildProductRequestBody({ access_token }, productConfig);
         
         const productResponse = await fetch(productConfig.apiEndpoint, {
           method: 'POST',
@@ -1287,10 +1297,7 @@ export default function Home() {
       }
 
       // Build request body with access token and any additional params
-      const requestBody: any = { access_token: accessToken };
-      if (productConfig.additionalApiParams) {
-        Object.assign(requestBody, productConfig.additionalApiParams);
-      }
+      const requestBody = buildProductRequestBody({ access_token: accessToken }, productConfig);
       
       const productResponse = await fetch(productConfig.apiEndpoint, {
         method: 'POST',
@@ -1390,10 +1397,7 @@ export default function Home() {
       }
 
       // Build request body with access token and any additional params
-      const requestBody: any = { access_token: demoAccessToken };
-      if (productConfig.additionalApiParams) {
-        Object.assign(requestBody, productConfig.additionalApiParams);
-      }
+      const requestBody = buildProductRequestBody({ access_token: demoAccessToken }, productConfig);
       
       const productResponse = await fetch(productConfig.apiEndpoint, {
         method: 'POST',
@@ -2326,7 +2330,7 @@ export default function Home() {
               disabled={false}
             />
             <SettingsToggle 
-              label="Use Alternative Credentials" 
+              label="Use ALT_PLAID_CLIENT_ID" 
               checked={tempUseAltCredentials} 
               onChange={handleToggleAltCredentials}
               disabled={!altCredentialsAvailable}
