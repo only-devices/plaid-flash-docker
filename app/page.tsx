@@ -12,6 +12,10 @@ import SettingsToggle from '@/components/SettingsToggle';
 import ArrowButton from '@/components/ArrowButton';
 import WebhookPanel from '@/components/WebhookPanel';
 import { PRODUCTS_ARRAY, PRODUCT_CONFIGS, getProductConfigById, ProductConfig } from '@/lib/productConfig';
+import { isWebhooksEnabledClient } from '@/lib/featureFlags';
+
+// Feature flag for webhooks (development-only)
+const WEBHOOKS_ENABLED = isWebhooksEnabledClient();
 
 export default function Home() {
   const [linkToken, setLinkToken] = useState<string | null>(null);
@@ -197,6 +201,11 @@ export default function Home() {
 
   // SSE connection for real-time webhook updates
   useEffect(() => {
+    // Only initialize webhooks if feature is enabled
+    if (!WEBHOOKS_ENABLED) {
+      return;
+    }
+
     let eventSource: EventSource | null = null;
 
     // Fetch webhook URL on mount
@@ -424,7 +433,7 @@ export default function Home() {
       }
 
       // Add webhook URL if available (will override or add to existing options)
-      if (webhookUrl) {
+      if (WEBHOOKS_ENABLED && webhookUrl) {
         sandboxFullConfig.options.webhook = webhookUrl;
       }
 
@@ -643,7 +652,7 @@ export default function Home() {
       }
 
       // Add webhook URL if available (will override or add to existing options)
-      if (webhookUrl) {
+      if (WEBHOOKS_ENABLED && webhookUrl) {
         sandboxFullConfig.options.webhook = webhookUrl;
       }
 
@@ -704,7 +713,7 @@ export default function Home() {
     }
 
     // Add webhook URL for products that require it
-    if (productConfig.requiresWebhook && webhookUrl) {
+    if (WEBHOOKS_ENABLED && productConfig.requiresWebhook && webhookUrl) {
       fullConfig.webhook = webhookUrl;
     }
 
@@ -1634,7 +1643,7 @@ export default function Home() {
       // Show webhook panel only for products that require webhooks (CRA products)
       const effectiveProductId = selectedGrandchildProduct || selectedChildProduct || selectedProduct;
       const productConfig = getProductConfigById(effectiveProductId!);
-      if (productConfig?.requiresWebhook) {
+      if (WEBHOOKS_ENABLED && webhookUrl && productConfig?.requiresWebhook) {
         setShowWebhookPanel(true);
       }
     }
@@ -1981,7 +1990,7 @@ export default function Home() {
     if (!zapMode) {
       const effectiveProductId = selectedGrandchildProduct || selectedChildProduct || selectedProduct;
       const productConfig = getProductConfigById(effectiveProductId!);
-      if (productConfig?.requiresWebhook) {
+      if (WEBHOOKS_ENABLED && webhookUrl && productConfig?.requiresWebhook) {
         setShowWebhookPanel(true);
       }
     }
@@ -2771,7 +2780,7 @@ export default function Home() {
       const apiName = productConfig?.apiTitle || '';
       
       // Check if we should show webhook panel (CRA products in Bypass Link mode)
-      const showEmbeddedWebhookPanel = isCRA && bypassLink;
+      const showEmbeddedWebhookPanel = WEBHOOKS_ENABLED && webhookUrl && isCRA && bypassLink;
       
       // Remove useAltCredentials from display (it's internal, not sent to Plaid)
       const { useAltCredentials: _, ...displayConfig } = productApiConfig;
@@ -3063,12 +3072,14 @@ export default function Home() {
               onChange={handleToggleBypassLink}
               disabled={false}
             />
-            <div className="settings-info-row">
-              <span className="settings-info-label">Webhook URL</span>
-              <span className="settings-info-value">
-                {webhookUrl ? webhookUrl : 'Not active'}
-              </span>
-            </div>
+            {WEBHOOKS_ENABLED && (
+              <div className="settings-info-row">
+                <span className="settings-info-label">Webhook URL</span>
+                <span className="settings-info-value">
+                  {webhookUrl ? webhookUrl : 'Not active'}
+                </span>
+              </div>
+            )}
           </div>
           <div className="button-row">
             <button className="action-button button-red" onClick={handleCancelSettings}>
@@ -3278,7 +3289,9 @@ export default function Home() {
       )}
 
       {/* Webhook Panel - Shows after onSuccess/onExit callbacks */}
-      <WebhookPanel webhooks={webhooks} visible={showWebhookPanel} />
+      {WEBHOOKS_ENABLED && webhookUrl && (
+        <WebhookPanel webhooks={webhooks} visible={showWebhookPanel} />
+      )}
     </div>
   );
 }

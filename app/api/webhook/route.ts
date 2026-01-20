@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { addWebhook } from '@/lib/webhookStore';
+import { isWebhooksEnabled } from '@/lib/featureFlags';
 
 // Note: Using Node.js runtime (not Edge) so webhook store shares memory with SSE stream
 
 export async function POST(request: NextRequest) {
+  // Only accept webhooks in development mode
+  if (!isWebhooksEnabled()) {
+    return NextResponse.json({ 
+      error: 'Webhooks are only available in development mode' 
+    }, { status: 404 });
+  }
+  
   try {
     const payload = await request.json();
     
@@ -33,6 +41,12 @@ export async function POST(request: NextRequest) {
 
 // Handle GET requests for health checks
 export async function GET() {
+  if (!isWebhooksEnabled()) {
+    return NextResponse.json({ 
+      error: 'Webhooks are only available in development mode' 
+    }, { status: 404 });
+  }
+  
   return NextResponse.json({ 
     status: 'ok', 
     message: 'Webhook endpoint is ready to receive Plaid webhooks' 

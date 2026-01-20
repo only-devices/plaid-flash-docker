@@ -1,18 +1,18 @@
 import { NextResponse } from 'next/server';
+import { isWebhooksEnabled } from '@/lib/featureFlags';
 
 export async function GET() {
-  try {
-    // In production (Vercel), use the VERCEL_URL
-    const vercelUrl = process.env.VERCEL_URL;
-    if (vercelUrl) {
-      const webhookUrl = `https://${vercelUrl}/api/webhook`;
-      return NextResponse.json({ 
-        webhookUrl,
-        environment: 'vercel',
-        status: 'ready'
-      });
-    }
+  // Only provide webhook URLs in development mode
+  if (!isWebhooksEnabled()) {
+    return NextResponse.json({ 
+      webhookUrl: null,
+      environment: process.env.NODE_ENV || 'unknown',
+      status: 'disabled',
+      message: 'Webhooks are only available in development mode with NGROK_AUTHTOKEN configured'
+    });
+  }
 
+  try {
     // In development, try to start ngrok tunnel
     if (process.env.NODE_ENV === 'development') {
       // Check if authtoken is configured
@@ -57,14 +57,6 @@ export async function GET() {
         });
       }
     }
-
-    // Fallback for other environments
-    return NextResponse.json({ 
-      webhookUrl: null,
-      environment: 'unknown',
-      status: 'unavailable',
-      message: 'Webhook URL not available in this environment'
-    });
   } catch (error: any) {
     console.error('Error getting webhook URL:', error);
     return NextResponse.json({ 

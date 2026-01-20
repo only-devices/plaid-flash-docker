@@ -13,10 +13,21 @@ Run the app using Docker - no Node.js installation required!
 3. Copy your **Client ID** and **Sandbox secret**
 4. Ensure you have a Link customization named `flash`
 
-### Step 2: Get ngrok authtoken
+### Step 2: Get ngrok authtoken (Optional - Development Only)
+
+**Note:** Webhooks and ngrok are only available for local development. They are automatically disabled in production deployments (e.g., Vercel).
 
 1. [Sign up](https://dashboard.ngrok.com/signup) for a free ngrok user account
 2. Copy your [authtoken](https://dashboard.ngrok.com/get-started/your-authtoken)
+
+**What this enables:**
+- Real-time webhook notifications for CRA (Consumer Reporting Agency) products
+- Transaction updates and sync events
+- Webhook testing panel in the UI
+
+**Skip this step if:**
+- You're only testing non-webhook products (Auth, Identity, Balance, etc.)
+- You're deploying to production (webhooks won't be available anyway)
 
 ### Step 2: Clone this repo
 `git clone https://github.com/only-devices/plaid-flash-docker.git`
@@ -42,9 +53,11 @@ PLAID_CLIENT_ID=your_client_id_here
 PLAID_SECRET=your_sandbox_secret_here
 PLAID_ENV=sandbox
 
-# ngrok Webhook Tunnel (required for CRA and Transactions)
+# ngrok Webhook Tunnel (optional - development only)
+# Enables webhook testing for CRA and Transaction products
 # Get your free token at: https://dashboard.ngrok.com/get-started/your-authtoken
-ngrok_AUTHTOKEN=your_ngrok_authtoken
+# Note: Webhooks are automatically disabled in production
+NGROK_AUTHTOKEN=your_ngrok_authtoken
 ```
 
 ### Step 3: Run with Docker Compose
@@ -138,7 +151,36 @@ plaid-flash/
 ### Backend
 - **Next.js API Routes** - Serverless endpoints
 - **plaid-fetch** - Edge-compatible Plaid client
-- **@ngrok/ngrok** - Webhook tunnel SDK
+- **@ngrok/ngrok** - Webhook tunnel SDK (development only)
+
+## 🌐 Deployment
+
+### Vercel / Production
+
+This app can be deployed to Vercel or other platforms. Webhook functionality (ngrok tunnel) is automatically disabled in production environments.
+
+**What works in production:**
+- All Plaid Link flows (Auth, Identity, Balance, Investments, etc.)
+- Token exchange and API calls
+- Product testing without webhooks
+
+**What's disabled in production:**
+- Ngrok tunnel
+- Webhook receiver endpoints
+- Webhook panel UI elements
+- Real-time webhook notifications
+
+**To deploy to Vercel:**
+
+1. Push your code to GitHub
+2. Import the project in Vercel
+3. Add your environment variables:
+   - `PLAID_CLIENT_ID`
+   - `PLAID_SECRET`
+   - `PLAID_ENV`
+4. Deploy!
+
+Note: Do not add `NGROK_AUTHTOKEN` to production environment variables.
 
 ## 🧪 Sandbox Test Credentials
 
@@ -168,20 +210,23 @@ ports:
   - "3001:3000"  # Use 3001 instead
 ```
 
-### ngrok tunnel not starting
-- Check `ngrok_AUTHTOKEN` is set in `.env`
+### ngrok tunnel not starting (Development)
+- Check `NGROK_AUTHTOKEN` is set in `.env`
 - Verify token is valid at [dashboard.ngrok.com](https://dashboard.ngrok.com)
 - Check Docker logs: `docker compose logs -f`
+- Note: Webhooks only work in development mode (`NODE_ENV=development`)
 
 ### Alt credentials not working
 - Verify both `ALT_PLAID_CLIENT_ID` and `ALT_PLAID_SECRET` are set
 - Create a fresh user after enabling the toggle
 - Check logs for credential selection
 
-### Webhook events not appearing
-- Ensure ngrok tunnel is running (check logs)
+### Webhook events not appearing (Development)
+- Ensure ngrok tunnel is running (check logs for "ngrok tunnel ready")
 - Verify webhook URL is set in Link Token config
 - Check webhook panel is visible in UI
+- Webhooks only work when `NODE_ENV=development` and `NGROK_AUTHTOKEN` is set
+- In production environments, webhooks are disabled
 
 ## 📜 License
 

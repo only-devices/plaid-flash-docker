@@ -1,10 +1,18 @@
 import { NextRequest } from 'next/server';
 import { addClient, removeClient, getWebhooks, sendHeartbeat } from '@/lib/webhookStore';
+import { isWebhooksEnabled } from '@/lib/featureFlags';
 
 // SSE endpoint for real-time webhook updates
 // Note: Cannot use Edge runtime with SSE as we need long-running connections
 
 export async function GET(request: NextRequest) {
+  // Only allow SSE connections in development mode
+  if (!isWebhooksEnabled()) {
+    return new Response('Webhook streaming is only available in development mode', { 
+      status: 404 
+    });
+  }
+  
   const encoder = new TextEncoder();
   
   let controller: ReadableStreamDefaultController;
