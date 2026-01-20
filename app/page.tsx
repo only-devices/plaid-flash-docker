@@ -25,7 +25,7 @@ export default function Home() {
   const [selectedChildProduct, setSelectedChildProduct] = useState<string | null>(null);
   const [selectedGrandchildProduct, setSelectedGrandchildProduct] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [modalState, setModalState] = useState<'loading' | 'preview-user-create' | 'preview-config' | 'callback-success' | 'callback-exit' | 'callback-exit-zap' | 'accounts-data' | 'processing-accounts' | 'processing-product' | 'processing-user-create' | 'success' | 'error' | 'api-error' | 'zap-mode-results' | 'tidying-up'>('loading');
+  const [modalState, setModalState] = useState<'loading' | 'preview-user-create' | 'preview-config' | 'preview-product-api' | 'callback-success' | 'callback-exit' | 'callback-exit-zap' | 'accounts-data' | 'processing-accounts' | 'processing-product' | 'processing-user-create' | 'success' | 'error' | 'api-error' | 'zap-mode-results' | 'tidying-up'>('loading');
   const [accountsData, setAccountsData] = useState<any>(null);
   const [productData, setProductData] = useState<any>(null);
   const [callbackData, setCallbackData] = useState<any>(null);
@@ -59,8 +59,8 @@ export default function Home() {
   const [tempUseAltCredentials, setTempUseAltCredentials] = useState(false);
   const [altCredentialsAvailable, setAltCredentialsAvailable] = useState(false);
   const [usedAltCredentials, setUsedAltCredentials] = useState<boolean>(false); // Track which credentials were used for this session
-  const [rememberedUserExperience, setRememberedUserExperience] = useState(false);
-  const [tempRememberedUserExperience, setTempRememberedUserExperience] = useState(false);
+  const [rememberedUserExperience, setRememberedUserExperience] = useState(true);
+  const [tempIncludePhoneNumber, settempIncludePhoneNumber] = useState(true);
   const hasCustomSettings = zapMode || embeddedMode || layerMode || demoMode || useLegacyUserToken || useAltCredentials || rememberedUserExperience;
   const [showZapResetButton, setShowZapResetButton] = useState(false);
   
@@ -79,6 +79,12 @@ export default function Home() {
   const [isEditingUserCreateConfig, setIsEditingUserCreateConfig] = useState(false);
   const [editedUserCreateConfig, setEditedUserCreateConfig] = useState('');
   const [userCreateConfigError, setUserCreateConfigError] = useState<string | null>(null);
+
+  // Product API Preview state
+  const [productApiConfig, setProductApiConfig] = useState<any>(null);
+  const [isEditingProductApiConfig, setIsEditingProductApiConfig] = useState(false);
+  const [editedProductApiConfig, setEditedProductApiConfig] = useState('');
+  const [productApiConfigError, setProductApiConfigError] = useState<string | null>(null);
 
   // Webhook state
   const [webhooks, setWebhooks] = useState<any[]>([]);
@@ -782,6 +788,180 @@ export default function Home() {
     }
   };
 
+  // Product API Preview Handlers
+  const handleToggleEditProductApiMode = () => {
+    if (!isEditingProductApiConfig) {
+      // Entering edit mode - populate editedProductApiConfig with current config
+      setEditedProductApiConfig(JSON.stringify(productApiConfig, null, 2));
+      setProductApiConfigError(null);
+    }
+    setIsEditingProductApiConfig(!isEditingProductApiConfig);
+  };
+
+  const handleSaveProductApiConfig = () => {
+    try {
+      const parsed = JSON.parse(editedProductApiConfig);
+      setProductApiConfig(parsed);
+      setProductApiConfigError(null);
+      setIsEditingProductApiConfig(false);
+      return true;
+    } catch (error: any) {
+      setProductApiConfigError(`Invalid JSON: ${error.message}`);
+      return false;
+    }
+  };
+
+  const handleCancelProductApiEdit = () => {
+    setIsEditingProductApiConfig(false);
+    setProductApiConfigError(null);
+    setEditedProductApiConfig('');
+  };
+
+  const handleSaveAndProceedWithProductApi = async () => {
+    try {
+      // Validate JSON first
+      const parsed = JSON.parse(editedProductApiConfig);
+      
+      // Close modal immediately to avoid showing read-only view
+      setShowModal(false);
+      
+      // Update config and reset edit state
+      setProductApiConfig(parsed);
+      setProductApiConfigError(null);
+      setIsEditingProductApiConfig(false);
+      
+      // Show processing state
+      setModalState('processing-product');
+      setShowModal(true);
+      
+      // Proceed with product API call
+      try {
+        const effectiveProductId = selectedGrandchildProduct || selectedChildProduct || selectedProduct;
+        const productConfig = getProductConfigById(effectiveProductId!);
+        
+        if (!productConfig || !productConfig.apiEndpoint) {
+          throw new Error('Product API endpoint not configured');
+        }
+        
+        const productResponse = await fetch(productConfig.apiEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(parsed),
+        });
+
+        const productData = await productResponse.json();
+        
+        // Check for API errors
+        if (productResponse.status >= 400) {
+          setErrorData(productData);
+          setApiStatusCode(productResponse.status);
+          setModalState('api-error');
+          setShowModal(true);
+          setShowWelcome(false);
+          return;
+        }
+        
+        setProductData(productData);
+        setApiStatusCode(productResponse.status);
+        setModalState('success');
+      } catch (error) {
+        console.error('Error fetching product data:', error);
+        setErrorMessage('Failed to fetch product data. Please try again.');
+        setModalState('error');
+        setShowModal(true);
+        setShowWelcome(false);
+        
+        // Reset after a delay
+        setTimeout(() => {
+          setShowModal(false);
+          setModalState('loading');
+          setShowProductModal(true);
+        }, 3000);
+      }
+    } catch (error: any) {
+      setProductApiConfigError(`Invalid JSON: ${error.message}`);
+    }
+  };
+
+  const handleProceedWithProductApi = async (configOverride?: any) => {
+    // User approved the product API config, now make the API call
+    setShowModal(false);
+    setModalState('processing-product');
+    setShowModal(true);
+    
+    try {
+      const effectiveProductId = selectedGrandchildProduct || selectedChildProduct || selectedProduct;
+      const productConfig = getProductConfigById(effectiveProductId!);
+      
+      if (!productConfig || !productConfig.apiEndpoint) {
+        throw new Error('Product API endpoint not configured');
+      }
+
+      // Use the configOverride if provided, otherwise use productApiConfig state
+      const configToUse = configOverride || productApiConfig;
+      
+      const productResponse = await fetch(productConfig.apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(configToUse),
+      });
+
+      const productData = await productResponse.json();
+      
+      // Check for API errors
+      if (productResponse.status >= 400) {
+        setErrorData(productData);
+        setApiStatusCode(productResponse.status);
+        setModalState('api-error');
+        setShowModal(true);
+        return;
+      }
+      
+      setProductData(productData);
+      setApiStatusCode(productResponse.status);
+      setModalState('success');
+    } catch (error) {
+      console.error('Error fetching product data:', error);
+      setErrorMessage('Failed to fetch product data. Please try again.');
+      setModalState('error');
+      setShowModal(true);
+      
+      // Reset after a delay
+      setTimeout(() => {
+        setShowModal(false);
+        setModalState('loading');
+        setShowProductModal(true);
+      }, 3000);
+    }
+  };
+
+  const handleGoBackFromProductApiPreview = () => {
+    // User wants to go back from product API preview
+    setShowModal(false);
+    setProductApiConfig(null);
+    setModalState('loading');
+    setIsEditingProductApiConfig(false);
+    setProductApiConfigError(null);
+    
+    // Determine where to go back based on product type
+    const effectiveProductId = selectedGrandchildProduct || selectedChildProduct || selectedProduct;
+    const productConfig = getProductConfigById(effectiveProductId!);
+    
+    if (productConfig?.isCRA) {
+      // CRA products: go back to callback-success modal
+      setModalState('callback-success');
+      setShowModal(true);
+    } else {
+      // Normal products: go back to accounts-data modal
+      setModalState('accounts-data');
+      setShowModal(true);
+    }
+  };
+
   // Settings Modal Handlers
   const handleOpenSettings = () => {
     // Copy current settings to temp state
@@ -819,7 +999,7 @@ export default function Home() {
     setDemoMode(tempDemoMode);
     setUseLegacyUserToken(tempUseLegacyUserToken);
     setUseAltCredentials(tempUseAltCredentials);
-    setRememberedUserExperience(tempRememberedUserExperience);
+    setRememberedUserExperience(tempIncludePhoneNumber);
     
     // Close settings modal
     setShowSettingsModal(false);
@@ -851,8 +1031,8 @@ export default function Home() {
     setTempEmbeddedMode(!tempEmbeddedMode);
   };
 
-  const handleToggleRememberedUser = () => {
-    setTempRememberedUserExperience(!tempRememberedUserExperience);
+  const handleToggleIncludePhoneNumber = () => {
+    settempIncludePhoneNumber(!tempIncludePhoneNumber);
   };
 
   const handleToggleLayer = () => {
@@ -1100,10 +1280,7 @@ export default function Home() {
     
     // Check if this is a CRA product
     if (productConfig?.isCRA) {
-      // CRA products: skip access_token exchange, call product endpoint directly with user_id/user_token
-      setModalState('processing-product');
-      setShowModal(true);
-
+      // CRA products: skip access_token exchange, show product API preview
       try {
         if (!productConfig.apiEndpoint) {
           throw new Error('Product API endpoint not configured');
@@ -1124,31 +1301,15 @@ export default function Home() {
         
         const requestBody = buildProductRequestBody(baseParams, productConfig);
         
-        const productResponse = await fetch(productConfig.apiEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        });
-
-        const productData = await productResponse.json();
-        
-        // Check for API errors
-        if (productResponse.status >= 400) {
-          setErrorData(productData);
-          setApiStatusCode(productResponse.status);
-          setModalState('api-error');
-          return;
-        }
-        
-        setProductData(productData);
-        setApiStatusCode(productResponse.status);
-        setModalState('success');
+        // Store the config and show preview modal
+        setProductApiConfig(requestBody);
+        setModalState('preview-product-api');
+        setShowModal(true);
       } catch (error) {
-        console.error('Error fetching CRA product data:', error);
-        setErrorMessage('We encountered an issue fetching CRA data. Please try again.');
+        console.error('Error building CRA product API config:', error);
+        setErrorMessage('We encountered an issue preparing the API call. Please try again.');
         setModalState('error');
+        setShowModal(true);
         
         // Reset after a delay
         setTimeout(() => {
@@ -1284,9 +1445,6 @@ export default function Home() {
   };
 
   const handleCallProduct = async () => {
-    // Show processing state for product
-    setModalState('processing-product');
-
     try {
       // Get the effective product ID (child if selected, otherwise parent)
       const effectiveProductId = selectedGrandchildProduct || selectedChildProduct || selectedProduct;
@@ -1299,31 +1457,12 @@ export default function Home() {
       // Build request body with access token and any additional params
       const requestBody = buildProductRequestBody({ access_token: accessToken }, productConfig);
       
-      const productResponse = await fetch(productConfig.apiEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      const productData = await productResponse.json();
-      
-      // Check for API errors
-      if (productResponse.status >= 400) {
-        setErrorData(productData);
-        setApiStatusCode(productResponse.status);
-        setModalState('api-error');
-        return;
-      }
-      
-      // Update state to show product data
-      setProductData(productData);
-      setApiStatusCode(productResponse.status);
-      setModalState('success');
+      // Store the config and show preview modal
+      setProductApiConfig(requestBody);
+      setModalState('preview-product-api');
     } catch (error) {
-      console.error('Error fetching product data:', error);
-      setErrorMessage('We encountered an issue fetching product data. Please try again.');
+      console.error('Error building product API config:', error);
+      setErrorMessage('We encountered an issue preparing the API call. Please try again.');
       setModalState('error');
       
       // Reset after a delay
@@ -2163,6 +2302,74 @@ export default function Home() {
       );
     }
 
+    if (modalState === 'preview-product-api' && productApiConfig) {
+      const effectiveProductId = selectedGrandchildProduct || selectedChildProduct || selectedProduct;
+      const productConfig = getProductConfigById(effectiveProductId!);
+      const isCRA = productConfig?.isCRA;
+      
+      // Extract endpoint name from apiEndpoint (e.g., "/api/transactions-get" -> "/transactions/get")
+      const apiName = productConfig?.apiTitle || '';
+      
+      return (
+        <div className="modal-success">
+          <div className="success-header">
+            <h2>Here&apos;s the {apiName} call that will be made:</h2>
+          </div>
+          {!isEditingProductApiConfig ? (
+            <>
+              <div className="account-data config-data-with-edit">
+                <button 
+                  className="config-edit-icon" 
+                  onClick={handleToggleEditProductApiMode}
+                  title="Edit configuration"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                </button>
+                <JsonHighlight data={productApiConfig} />
+              </div>
+              <div className="modal-button-row two-buttons">
+                <ArrowButton variant="red" direction="back" onClick={handleGoBackFromProductApiPreview} />
+                <ArrowButton variant="blue" onClick={() => handleProceedWithProductApi(productApiConfig)} />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="code-editor-container">
+                <CodeEditor
+                  value={editedProductApiConfig}
+                  language="json"
+                  onChange={(e) => setEditedProductApiConfig(e.target.value)}
+                  padding={15}
+                  data-color-mode="dark"
+                  style={{
+                    fontSize: 13,
+                    fontFamily: 'Monaco, Menlo, Ubuntu Mono, Consolas, monospace',
+                    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                    borderRadius: '12px',
+                    minHeight: '400px',
+                    maxHeight: '500px',
+                    overflowY: 'auto',
+                  }}
+                />
+                {productApiConfigError && (
+                  <div className="config-error">
+                    {productApiConfigError}
+                  </div>
+                )}
+              </div>
+              <div className="modal-button-row two-buttons">
+                <ArrowButton variant="red" direction="back" onClick={handleCancelProductApiEdit} />
+                <ArrowButton variant="blue" onClick={handleSaveAndProceedWithProductApi} />
+              </div>
+            </>
+          )}
+        </div>
+      );
+    }
+
     if (modalState === 'success' && productData) {
       const effectiveProductId = selectedGrandchildProduct || selectedChildProduct || selectedProduct;
       const productConfig = getProductConfigById(effectiveProductId!);
@@ -2306,15 +2513,15 @@ export default function Home() {
               disabled={tempZapMode} 
             />
             <SettingsToggle 
-              label="Embedded Mode" 
+              label="Embedded Link Mode" 
               checked={tempEmbeddedMode} 
               onChange={handleToggleEmbedded} 
               disabled={false}
             />
             <SettingsToggle 
-              label="Remembered User Experience" 
-              checked={tempRememberedUserExperience} 
-              onChange={handleToggleRememberedUser} 
+              label="Include phone_number in Link Token Create config" 
+              checked={tempIncludePhoneNumber} 
+              onChange={handleToggleIncludePhoneNumber} 
               disabled={false}
             />
             <SettingsToggle 

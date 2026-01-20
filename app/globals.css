@@ -19,6 +19,10 @@ body {
   overflow: hidden;
 }
 
+.inline-code {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
+}
+
 /* Welcome Animation */
 .welcome-text {
   font-size: 32px;
